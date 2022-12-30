@@ -52,7 +52,7 @@ fn Simulator(comptime T: type) type {
             errdefer allocator.free(east_data);
             var west_data = try allocator.alloc(Int, 2*BitsPerByte*height*pitch);
             errdefer allocator.free(west_data);
-            var player_data = try allocator.alloc(Int, 2*(height + 2)*(pitch+1));
+            var player_data = try allocator.alloc(Int, 2*(height + 2)*pitch);
             errdefer allocator.free(player_data);
 
             const size = pitch*height;
@@ -176,9 +176,9 @@ fn Simulator(comptime T: type) type {
         }
 
         fn getPlayerPtr(self: Self, iter: usize) [*]Int {
-            var ptr = self.player_data.ptr + self.pitch + 1;
+            var ptr = self.player_data.ptr + self.pitch;
             if (iter % 2 == 0) {
-                ptr += (self.height + 2) * (self.pitch + 1);
+                ptr += (self.height + 2) * self.pitch;
             }
             return ptr;
         }
@@ -207,11 +207,11 @@ fn Simulator(comptime T: type) type {
             var dst = self.getPlayerPtr(self.iter);
 
             for (range(self.height)) |_| {
-                const above = src - (self.pitch + 1);
-                const below = src + (self.pitch + 1);
+                const above = src - self.pitch;
+                const below = src + self.pitch;
                 var left : Int = 0;
                 var center = src[0];
-                for (range(p)) |_, j| {
+                for (range(p - 1)) |_, j| {
                     const right = src[j+1];
                     const up = above[j];
                     const down = below[j];
@@ -222,6 +222,17 @@ fn Simulator(comptime T: type) type {
                     dst[j] = (left1 | right1 | up | down | center) & ~(north[j] | south[j] | east[j] | west[j]);
                     left = center;
                     center = right;
+                }
+                { // last column
+                    const j = p - 1;
+                    const right = 0;
+                    const up = above[j];
+                    const down = below[j];
+
+                    const left1 = funnel_shift_l(Int, center, left, 1);
+                    const right1 = funnel_shift_r(Int, right, center, 1);
+
+                    dst[j] = (left1 | right1 | up | down | center) & ~(north[j] | south[j] | east[j] | west[j]);
                 }
 
                 north += self.pitch;
@@ -234,8 +245,8 @@ fn Simulator(comptime T: type) type {
                 }
                 east += 2*self.pitch;
                 west += 2*self.pitch;
-                src += self.pitch + 1;
-                dst += self.pitch + 1;
+                src += self.pitch;
+                dst += self.pitch;
             }
         }
     };
@@ -315,12 +326,12 @@ pub fn process(allocator: std.mem.Allocator, input: []const u8) !void {
     const j = @intCast(Sim.ShiftInt, (width - 1) % Sim.Nbits);
     { // First travel
         std.mem.set(Sim.Int, sim.player_data, 0);
-        (sim.getPlayerPtr(sim.iter) - (pitch + 1))[0] = 1;
+        (sim.getPlayerPtr(sim.iter) - pitch)[0] = 1;
         while (true) {
             //try std.fmt.format(stdout, "processing iter {}\n", .{sim.iter});
             sim.step();
 
-            if ((sim.getPlayerPtr(sim.iter)[(height - 1) * (pitch + 1) + J] >> j) & 1 == 1) {
+            if ((sim.getPlayerPtr(sim.iter)[(height - 1) * pitch + J] >> j) & 1 == 1) {
                 sim.iter += 1;
                 break;
             }
@@ -330,7 +341,7 @@ pub fn process(allocator: std.mem.Allocator, input: []const u8) !void {
 
     { // Second travel Back
         std.mem.set(Sim.Int, sim.player_data, 0);
-        sim.getPlayerPtr(sim.iter)[height * (pitch + 1) + J] = @as(Sim.Int, 1) << j;
+        sim.getPlayerPtr(sim.iter)[height * pitch + J] = @as(Sim.Int, 1) << j;
         while (true) {
             sim.step();
 
@@ -344,11 +355,11 @@ pub fn process(allocator: std.mem.Allocator, input: []const u8) !void {
 
     { // Third travel (again)
         std.mem.set(Sim.Int, sim.player_data, 0);
-        (sim.getPlayerPtr(sim.iter) - (pitch + 1))[0] = 1;
+        (sim.getPlayerPtr(sim.iter) - pitch)[0] = 1;
         while (true) {
             sim.step();
 
-            if ((sim.getPlayerPtr(sim.iter)[(height - 1) * (pitch + 1) + J] >> j) & 1 == 1) {
+            if ((sim.getPlayerPtr(sim.iter)[(height - 1) * pitch + J] >> j) & 1 == 1) {
                 sim.iter += 1;
                 break;
             }
