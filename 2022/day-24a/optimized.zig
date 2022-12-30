@@ -183,35 +183,35 @@ fn Simulator(comptime T: type) type {
             return ptr;
         }
 
-        // Trampoline helps the compiler to see that Simulator is not changed during the processing
-        fn step(self: *Self) void {
+        noinline fn step(self: *Self) void {
             self.iter += 1;
-            self.stepIter();
-        }
-        noinline fn stepIter(self: Self) void {
-            const size = self.height * self.pitch;
+            const iter = self.iter;
+            const pitch = self.pitch;
+            const height = self.height;
+            const size = height * pitch;
             const north_start = self.north_data.ptr;
             const south_start = self.south_data.ptr;
             const north_end = north_start + size;
             const south_end = south_start + size;
-            const p = (self.width + Nbits - 1) / Nbits;
-            var north = north_start + (self.iter % self.height) * self.pitch;
-            var south = south_start + (self.height - (self.iter % self.height)) * self.pitch;
+            var north = north_start + (iter % height) * pitch;
+            var south = south_start + (height - (iter % height)) * pitch;
             if (south == south_end) {
                 south = south_start;
             }
 
-            var east = self.getEastPtr(self.iter);
-            var west = self.getWestPtr(self.iter);
-            var src = self.getPlayerPtr(self.iter - 1);
-            var dst = self.getPlayerPtr(self.iter);
+            var east = self.getEastPtr(iter);
+            var west = self.getWestPtr(iter);
+            var src = self.getPlayerPtr(iter - 1);
+            var dst = self.getPlayerPtr(iter);
 
-            for (range(self.height)) |_| {
-                const above = src - self.pitch;
-                const below = src + self.pitch;
+            assert(pitch > 0);
+
+            for (range(height)) |_| {
+                const above = src - pitch;
+                const below = src + pitch;
                 var left : Int = 0;
                 var center = src[0];
-                for (range(p - 1)) |_, j| {
+                for (range(pitch - 1)) |_, j| {
                     const right = src[j+1];
                     const up = above[j];
                     const down = below[j];
@@ -224,7 +224,7 @@ fn Simulator(comptime T: type) type {
                     center = right;
                 }
                 { // last column
-                    const j = p - 1;
+                    const j = pitch - 1;
                     const right = 0;
                     const up = above[j];
                     const down = below[j];
@@ -235,18 +235,18 @@ fn Simulator(comptime T: type) type {
                     dst[j] = (left1 | right1 | up | down | center) & ~(north[j] | south[j] | east[j] | west[j]);
                 }
 
-                north += self.pitch;
+                north += pitch;
                 if (north == north_end) {
                     north = north_start;
                 }
-                south += self.pitch;
+                south += pitch;
                 if (south == south_end) {
                     south = south_start;
                 }
-                east += 2*self.pitch;
-                west += 2*self.pitch;
-                src += self.pitch;
-                dst += self.pitch;
+                east += 2*pitch;
+                west += 2*pitch;
+                src += pitch;
+                dst += pitch;
             }
         }
     };
