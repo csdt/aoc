@@ -211,7 +211,21 @@ fn Simulator(comptime T: type) type {
                 const below = src + pitch;
                 var left : Int = 0;
                 var center = src[0];
-                for (range(pitch - 1)) |_, j| {
+                { // first column
+                    const j = 0;
+                    const right = src[j+1];
+                    const up = above[j];
+                    const down = below[j];
+
+                    const left1 = funnel_shift_l(Int, center, left, 1);
+                    const right1 = funnel_shift_r(Int, right, center, 1);
+
+                    dst[j] = (left1 | right1 | up | down | center) & ~(north[j] | south[j] | east[j] | west[j]);
+                    left = center;
+                    center = right;
+                }
+                for (range(pitch - 2)) |_, k| {
+                    const j = k+1;
                     const right = src[j+1];
                     const up = above[j];
                     const down = below[j];
